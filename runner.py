@@ -104,29 +104,37 @@ def set_feedback(human_guess):
 	return feedback
 
 ## Process feedback
-def process_feedback(feedback, remaining_words):
-	print("\n** PROCESSING FEEDBACK **")
-	print("There were {} possible words left".format(len(remaining_words)))
-	print(feedback)
+def process_feedback(feedback, remaining_words, do_print=False):
+	if do_print:
+		print("\n** PROCESSING FEEDBACK **")
+		print("There were {} possible words left".format(len(remaining_words)))
+		print(feedback)
 
 	###### PROCESS GRAY
-	## Obtain gray letters
+	## Obtain gray letters (and green_yellow_letters)
+	green_yellow_letters = set()
 	gray_letters = set()
 	for ltr, clr in feedback:
 		if clr == 'GRAY':
 			gray_letters.add(ltr)
+		else:
+			green_yellow_letters.add(ltr)
+
 	## Remove all words that contain the gray letter
 	words_to_remove = set()
+	gray_letters_final = set()
 	for word in remaining_words:
 		for ltr in gray_letters:
-			if ltr in word:
+			if ltr in word and ltr not in green_yellow_letters:
+				gray_letters_final.add(ltr)
 				words_to_remove.add(word)
 	for word in words_to_remove:
 		remaining_words.remove(word)
-	print("1. Evaluating gray letters")
-	print(" 1.1 Eliminating these letters entirely (absence known): {}".format(gray_letters))
-	print(" 1.2 Removing {} words due to gray letters".format(len(words_to_remove)))
-	print(" 1.3 There are {} possible words left".format(len(remaining_words)))
+	if do_print:
+		print("1. Evaluating gray letters")
+		print(" 1.1 Eliminating these letters entirely (absence known): {}".format(gray_letters_final))
+		print(" 1.2 Removing {} words due to gray letters".format(len(words_to_remove)))
+		print(" 1.3 There are {} possible words left".format(len(remaining_words)))
 
 	###### PROCESS GREEN+YELLOW
 	# Preserve only words with yellow or green letters
@@ -143,10 +151,12 @@ def process_feedback(feedback, remaining_words):
 				words_to_remove.add(word)
 	for word in words_to_remove:
 		remaining_words.remove(word)
-	print("2. Evaluating yellow/green letters (presence known)")
-	print(" 2.1 Preserving only words with these letters: {}".format(green_yellow_letters))
-	print(" 2.2 Removing {} words due to yellow/green letters".format(len(words_to_remove)))
-	print(" 2.3 There are {} possible words left".format(len(remaining_words)))
+
+	if do_print:
+		print("2. Evaluating yellow/green letters (presence known)")
+		print(" 2.1 Preserving only words with these letters: {}".format(green_yellow_letters))
+		print(" 2.2 Removing {} words due to yellow/green letters".format(len(words_to_remove)))
+		print(" 2.3 There are {} possible words left".format(len(remaining_words)))
 
 	###### PROCESS PURE GREEN
 	# Preserve only words that have a green in the right spot
@@ -169,10 +179,12 @@ def process_feedback(feedback, remaining_words):
 					words_to_remove.add(word)
 	for word in words_to_remove:
 		remaining_words.remove(word)
-	print("3. Evaluating pure green letters")
-	print(" 3.1 Preserving only words with this sequence (place known): {}".format(green_string))
-	print(" 3.2 Removing {} words due to pure green letters".format(len(words_to_remove)))
-	print(" 3.3 There are {} possible words left".format(len(remaining_words)))
+
+	if do_print:
+		print("3. Evaluating pure green letters")
+		print(" 3.1 Preserving only words with this sequence (place known): {}".format(green_string))
+		print(" 3.2 Removing {} words due to pure green letters".format(len(words_to_remove)))
+		print(" 3.3 There are {} possible words left".format(len(remaining_words)))
 
 
 	###### PROCESS PURE YELLOW
@@ -189,32 +201,36 @@ def process_feedback(feedback, remaining_words):
 	for word in words_to_remove:
 		remaining_words.remove(word)
 	yellow_letters = sorted(yellow_letters,key=itemgetter(0))
-	print("4. Evaluating pure yellow letters")
-	print(" 4.1 Eliminating words with this sequence (place known) [zero-indexed]: {}".format(yellow_letters))
-	print(" 4.2 Removing {} words due to pure yellow letters".format(len(words_to_remove)))
-	print(" 4.3 There are {} possible words left".format(len(remaining_words)))
 
-	print("... Remaining word counts by letter:")
+	if do_print:
+		print("4. Evaluating pure yellow letters")
+		print(" 4.1 Eliminating words with this sequence (place known) [zero-indexed]: {}".format(yellow_letters))
+		print(" 4.2 Removing {} words due to pure yellow letters".format(len(words_to_remove)))
+		print(" 4.3 There are {} possible words left".format(len(remaining_words)))
+
+		print("... Remaining word counts by letter:")
 	wcs = word_count_by_letter_in_word(remaining_words)
 
-	print_letters_by_word_count(wcs)
+	if do_print:
+		print_letters_by_word_count(wcs)
 
 	scored_words = score_words(remaining_words, wcs)
 	auto_next_guess = scored_words[0][0]
 
 	# If fewer than X words left, expose them
 	WORDS_TO_EXPOSE_THRESOLD = 20
-	if len(remaining_words) <= WORDS_TO_EXPOSE_THRESOLD:
-		print("There are fewer than {} words left, and they are:".format(WORDS_TO_EXPOSE_THRESOLD))
-		print(score_words(remaining_words, wcs))
-	else:
-		print("Top {} suggested words are:".format(WORDS_TO_EXPOSE_THRESOLD))
-		print(score_words(remaining_words, wcs)[0:WORDS_TO_EXPOSE_THRESOLD])
+	if do_print:
+		if len(remaining_words) <= WORDS_TO_EXPOSE_THRESOLD:
+			print("There are fewer than {} words left, and they are:".format(WORDS_TO_EXPOSE_THRESOLD))
+			print(score_words(remaining_words, wcs))
+		else:
+			print("Top {} suggested words are:".format(WORDS_TO_EXPOSE_THRESOLD))
+			print(score_words(remaining_words, wcs)[0:WORDS_TO_EXPOSE_THRESOLD])
 
 	return remaining_words, auto_next_guess
 
 ## Start game when secret is known
-def run_game(WORD_LENGTH, remaining_words, SEED_WORD, SECRET_WORD, AUTO_GUESS, OVERRIDE_CONFIRM):
+def run_game(WORD_LENGTH, remaining_words, SEED_WORD, SECRET_WORD, AUTO_GUESS, OVERRIDE_CONFIRM, DO_PRINT):
 	# Set up variables
 	num_guesses = 0
 	guesses_list = list()
@@ -222,16 +238,19 @@ def run_game(WORD_LENGTH, remaining_words, SEED_WORD, SECRET_WORD, AUTO_GUESS, O
 	human_prompt_guess = "Guess a {}-letter word: ".format(WORD_LENGTH)
 	SECRET_KNOWN = len(SECRET_WORD) == WORD_LENGTH
 
-	print("**** WELCOME TO SMARTWORDLE ****")
+	if DO_PRINT:
+		print("**** WELCOME TO SMARTWORDLE ****")
 	while True:
-		print("****************************************************")
-		print("Number of guesses so far: {}".format(num_guesses))
-		print("Guesses so far: {}".format(guesses_list))
-		print("****************************************************")
+		if DO_PRINT:
+			print("****************************************************")
+			print("Number of guesses so far: {}".format(num_guesses))
+			print("Guesses so far: {}".format(guesses_list))
+			print("****************************************************")
 
 		# Guess engine
 		if AUTO_GUESS:
-			print(human_prompt_guess)
+			if DO_PRINT:
+				print(human_prompt_guess)
 			human_guess = auto_next_guess
 			if OVERRIDE_CONFIRM is False:
 				confirm_guess = raw_input("Do you want to guess the word {} (Y/N): ".format(human_guess)).upper()[0]
@@ -240,40 +259,50 @@ def run_game(WORD_LENGTH, remaining_words, SEED_WORD, SECRET_WORD, AUTO_GUESS, O
 		else:
 			human_guess = raw_input(human_prompt_guess).upper()
 
-		print("You guessed {}".format(human_guess))
+		if DO_PRINT:
+			print("You guessed {}".format(human_guess))
 		guesses_list.append(human_guess)
 		num_guesses += 1
 		if len(human_guess) != WORD_LENGTH:
 			print("Quitting game...")
 			return list()
 		elif SECRET_KNOWN and human_guess == SECRET_WORD:
-			print("YOU WIN!")
-			print("Guesses were: {}".format(guesses_list))
+			if DO_PRINT:
+				print("YOU WIN!")
+				print("Guesses were: {}".format(guesses_list))
 			return guesses_list
 		else:
 			if SECRET_KNOWN:
 				feedback = get_feedback(SECRET_WORD, human_guess)
 			else:
 				feedback = set_feedback(human_guess)
-			remaining_words, auto_next_guess = process_feedback(feedback, remaining_words)
+			remaining_words, auto_next_guess = process_feedback(feedback, remaining_words, do_print=DO_PRINT)
 			if len(remaining_words) == 1 and list(remaining_words)[0] == human_guess:
-				print("YOU WIN!")
-				print("Guesses were: {}".format(guesses_list))
+				if DO_PRINT:
+					print("YOU WIN!")
+					print("Guesses were: {}".format(guesses_list))
 				return guesses_list
 			else:
-				print("Keep guessing!")
+				if DO_PRINT:
+					print("Keep guessing!")
 
 ## Simulate a number of games
 def simulate_N_games(WORD_LENGTH, SEED_WORD, NUM_GAMES):
+	print("Seed word: {}".format(SEED_WORD))
+	print("Starting simulation of {} games with random 'secret' words...".format(NUM_GAMES))
 	results_compiled = list()
 	for round in range(0, NUM_GAMES):
 		remaining_words = get_word_dictionary(WORD_LENGTH)
 		secret_word = random.choice(list(remaining_words))
-		result = run_game(WORD_LENGTH, remaining_words, SEED_WORD, SECRET_WORD=secret_word, AUTO_GUESS=True, OVERRIDE_CONFIRM=True)
+		result = run_game(WORD_LENGTH, remaining_words, SEED_WORD, SECRET_WORD=secret_word, AUTO_GUESS=True, OVERRIDE_CONFIRM=True, DO_PRINT=False)
 		results_compiled.append((result))
 
-	for result in results_compiled:
-		print("Guessed in {} turns: {}".format(len(result), result))
+	# for result in results_compiled:
+	# 	print("Guessed in {} turns: {}".format(len(result), result))
+
+	print("Simulation complete!")
+	guesses_per_game = [len(result) for result in results_compiled]
+	print("Average number of guesses per game: {}".format(np.mean(guesses_per_game)))
 
 
 #--------------------------------------------------------------------------------------------
@@ -294,6 +323,6 @@ SEED_WORD = "STARE"
 AUTO_GUESS = True
 remaining_words = get_word_dictionary(WORD_LENGTH)
 
-result = run_game(WORD_LENGTH, remaining_words, SEED_WORD, SECRET_WORD="", AUTO_GUESS=True, OVERRIDE_CONFIRM=False)
+#result = run_game(WORD_LENGTH, remaining_words, SEED_WORD, SECRET_WORD="", AUTO_GUESS=True, OVERRIDE_CONFIRM=False, DO_PRINT=True)
 
-#simulate_N_games(WORD_LENGTH, SEED_WORD, 4)
+simulate_N_games(WORD_LENGTH, SEED_WORD, 250)
