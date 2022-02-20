@@ -2,6 +2,7 @@
 import string
 from operator import itemgetter
 import random
+import numpy as np
 
 
 ## INPUT: Get dictionary
@@ -168,11 +169,30 @@ def process_feedback(feedback, remaining_words):
 					words_to_remove.add(word)
 	for word in words_to_remove:
 		remaining_words.remove(word)
-
 	print("3. Evaluating pure green letters")
 	print(" 3.1 Preserving only words with this sequence (place known): {}".format(green_string))
 	print(" 3.2 Removing {} words due to pure green letters".format(len(words_to_remove)))
 	print(" 3.3 There are {} possible words left".format(len(remaining_words)))
+
+
+	###### PROCESS PURE YELLOW
+	# Build up list of regexs with yellows that are invalid
+	# Remove all words that have a yellow in the wrong spot
+	yellow_letters = set()
+	words_to_remove = set()
+	for i, (ltr, clr) in enumerate(feedback):
+		if clr == "YELLOW":
+			for word in remaining_words:
+				if word[i] == ltr:
+					yellow_letters.add((i, ltr))
+					words_to_remove.add(word)
+	for word in words_to_remove:
+		remaining_words.remove(word)
+	yellow_letters = sorted(yellow_letters,key=itemgetter(0))
+	print("4. Evaluating pure yellow letters")
+	print(" 4.1 Eliminating words with this sequence (place known) [zero-indexed]: {}".format(yellow_letters))
+	print(" 4.2 Removing {} words due to pure yellow letters".format(len(words_to_remove)))
+	print(" 4.3 There are {} possible words left".format(len(remaining_words)))
 
 	print("... Remaining word counts by letter:")
 	wcs = word_count_by_letter_in_word(remaining_words)
@@ -180,6 +200,7 @@ def process_feedback(feedback, remaining_words):
 	print_letters_by_word_count(wcs)
 
 	scored_words = score_words(remaining_words, wcs)
+	auto_next_guess = scored_words[0][0]
 
 	# If fewer than X words left, expose them
 	WORDS_TO_EXPOSE_THRESOLD = 20
@@ -188,9 +209,72 @@ def process_feedback(feedback, remaining_words):
 		print(score_words(remaining_words, wcs))
 	else:
 		print("Top {} suggested words are:".format(WORDS_TO_EXPOSE_THRESOLD))
-		print(score_words(remaining_words, wcs)[1:WORDS_TO_EXPOSE_THRESOLD])
+		print(score_words(remaining_words, wcs)[0:WORDS_TO_EXPOSE_THRESOLD])
 
-	return remaining_words
+	return remaining_words, auto_next_guess
+
+## Start game when secret is known
+def run_game(WORD_LENGTH, remaining_words, SEED_WORD, SECRET_WORD, AUTO_GUESS, OVERRIDE_CONFIRM):
+	# Set up variables
+	num_guesses = 0
+	guesses_list = list()
+	auto_next_guess = SEED_WORD
+	human_prompt_guess = "Guess a {}-letter word: ".format(WORD_LENGTH)
+	SECRET_KNOWN = len(SECRET_WORD) == WORD_LENGTH
+
+	print("**** WELCOME TO SMARTWORDLE ****")
+	while True:
+		print("****************************************************")
+		print("Number of guesses so far: {}".format(num_guesses))
+		print("Guesses so far: {}".format(guesses_list))
+		print("****************************************************")
+
+		# Guess engine
+		if AUTO_GUESS:
+			print(human_prompt_guess)
+			human_guess = auto_next_guess
+			if OVERRIDE_CONFIRM is False:
+				confirm_guess = raw_input("Do you want to guess the word {} (Y/N): ".format(human_guess)).upper()[0]
+				if confirm_guess != "Y":
+					human_guess = raw_input(human_prompt_guess).upper()
+		else:
+			human_guess = raw_input(human_prompt_guess).upper()
+
+		print("You guessed {}".format(human_guess))
+		guesses_list.append(human_guess)
+		num_guesses += 1
+		if len(human_guess) != WORD_LENGTH:
+			print("Quitting game...")
+			return list()
+		elif SECRET_KNOWN and human_guess == SECRET_WORD:
+			print("YOU WIN!")
+			print("Guesses were: {}".format(guesses_list))
+			return guesses_list
+		else:
+			if SECRET_KNOWN:
+				feedback = get_feedback(SECRET_WORD, human_guess)
+			else:
+				feedback = set_feedback(human_guess)
+			remaining_words, auto_next_guess = process_feedback(feedback, remaining_words)
+			if len(remaining_words) == 1 and list(remaining_words)[0] == human_guess:
+				print("YOU WIN!")
+				print("Guesses were: {}".format(guesses_list))
+				return guesses_list
+			else:
+				print("Keep guessing!")
+
+## Simulate a number of games
+def simulate_N_games(WORD_LENGTH, SEED_WORD, NUM_GAMES):
+	results_compiled = list()
+	for round in range(0, NUM_GAMES):
+		remaining_words = get_word_dictionary(WORD_LENGTH)
+		secret_word = random.choice(list(remaining_words))
+		result = run_game(WORD_LENGTH, remaining_words, SEED_WORD, SECRET_WORD=secret_word, AUTO_GUESS=True, OVERRIDE_CONFIRM=True)
+		results_compiled.append((result))
+
+	for result in results_compiled:
+		print("Guessed in {} turns: {}".format(len(result), result))
+
 
 #--------------------------------------------------------------------------------------------
 
@@ -203,35 +287,13 @@ def process_feedback(feedback, remaining_words):
 # Try again with a new human_guess (based on smaller set of words)
 
 ## SIMULATOR
-print("**** WELCOME TO SMARTWORDLE ****")
+
+# Config
 WORD_LENGTH = 5
+SEED_WORD = "STARE"
+AUTO_GUESS = True
 remaining_words = get_word_dictionary(WORD_LENGTH)
-secret_word = random.choice(list(remaining_words))
-num_guesses = 0
-guesses_list = list()
 
-# Start loop
-while True:
-	print("*************")
-	print("Number of guesses so far: {}".format(num_guesses))
-	print("Guesses so far: {}".format(guesses_list))
-	human_guess = raw_input("Guess a {}-letter word: ".format(WORD_LENGTH)).upper()
-	guesses_list.append(human_guess)
-	num_guesses += 1
-	if len(human_guess) != WORD_LENGTH:
-		print("Quitting game...")
-		quit()
-	elif human_guess == secret_word or len(remaining_words) == 1:
-		print("YOU WIN!")
-		quit()
-	else:
-		#feedback = get_feedback(secret_word, human_guess)
-		feedback = set_feedback(human_guess)
-		remaining_words = process_feedback(feedback, remaining_words)
-		print("Keep guessing!")
+result = run_game(WORD_LENGTH, remaining_words, SEED_WORD, SECRET_WORD="", AUTO_GUESS=True, OVERRIDE_CONFIRM=False)
 
-###############
-# TO DO LIST
-### TODO: Corner case: multiple of same letter
-### TODO: Incorporate knowing where a yellow letter is NOT located
-### TODO: Secret is not known (currently using a computer-known random secret)
+#simulate_N_games(WORD_LENGTH, SEED_WORD, 4)
